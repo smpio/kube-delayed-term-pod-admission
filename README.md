@@ -1,6 +1,6 @@
 # kube-delayed-term-pod-admission
 
-After marking container as terminating and before sending SIGTERM wait some amount of time until all cluster loadbalancers and proxies stop sending traffic to this pod. See https://github.com/kubernetes/kubernetes/issues/43576 and https://blog.gruntwork.io/delaying-shutdown-to-wait-for-pod-deletion-propagation-445f779a8304 for details.
+After marking container as terminating and before sending SIGTERM wait some amount of time until all cluster loadbalancers and proxies stop sending traffic to this pod. See https://github.com/kubernetes/kubernetes/issues/43576#issuecomment-297731021 and https://blog.gruntwork.io/delaying-shutdown-to-wait-for-pod-deletion-propagation-445f779a8304 for details.
 
 Delay depends on size of the cluster. Use the following command from different pod to test traffic failures during rolling update: `while true; do curl -sSO SERVICE_IP/healthz; echo -n '*'; done`.
 
