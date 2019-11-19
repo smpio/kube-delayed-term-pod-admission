@@ -1,0 +1,14 @@
+package: github.com/smpio/kube-delayed-term-pod-admission
+import:
+- package: gopkg.in/alessio/shellescape.v1
+  version: ~1.2.0
+- package: k8s.io/api
+  subpackages:
+  - admission/v1beta1
+  - admissionregistration/v1beta1
+  - core/v1
+- package: k8s.io/apimachinery
+  subpackages:
+  - pkg/apis/meta/v1
+  - pkg/runtime
+  - pkg/runtime/serializer
