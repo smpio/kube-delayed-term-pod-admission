@@ -1,7 +1,10 @@
 # kube-delayed-term-pod-admission
 
+After marking container as terminating and before sending SIGTERM wait some amount of time until all cluster loadbalancers and proxies stop sending traffic to this pod. See https://github.com/kubernetes/kubernetes/issues/43576 and https://blog.gruntwork.io/delaying-shutdown-to-wait-for-pod-deletion-propagation-445f779a8304 for details.
 
-This is [Admission Webhook](https://kubernetes.io/docs/admin/extensible-admission-controllers/#admission-webhooks) that adds Pod `preStop` hook with some delay:
+Delay depends on size of the cluster. Use the following command from different pod to test traffic failures during rolling update: `while true; do curl -sSO SERVICE_IP/healthz; echo -n '*'; done`.
+
+This [Admission Webhook](https://kubernetes.io/docs/admin/extensible-admission-controllers/#admission-webhooks) adds Pod `preStop` hook with some delay:
 
 ```
 lifecycle:
@@ -14,7 +17,6 @@ terminationGracePeriodSeconds: 60  # default 30 + sleep 30
 ```
 
 It also increases `terminationGracePeriodSeconds` with that delay.
-
 
 ## Installation
 
