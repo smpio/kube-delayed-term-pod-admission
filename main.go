@@ -195,7 +195,7 @@ func makeContainerOperation(index int, c *corev1.Container) *operation {
 		"preStop": {
 			"httpGet": {
 				"host": admissionServiceIp,
-				"path": "/delay",
+				"path": "delay",
 				"port": 80,
 			},
 		},
