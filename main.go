@@ -56,12 +56,17 @@ func main() {
 
 	http.HandleFunc("/", serve)
 	http.HandleFunc("/delay", serveDelay)
-	server := &http.Server{
+
+	httpServer := &http.Server{
+		Addr: ":80",
+	}
+	go httpServer.ListenAndServe()
+
+	httpsServer := &http.Server{
 		Addr:      ":443",
 		TLSConfig: configTLS(CertFile, KeyFile),
 	}
-	go server.ListenAndServe()
-	server.ListenAndServeTLS("", "")
+	httpsServer.ListenAndServeTLS("", "")
 }
 
 func configTLS(CertFile string, KeyFile string) *tls.Config {
