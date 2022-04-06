@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strings"
+	"time"
 
 	"k8s.io/api/admission/v1beta1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
@@ -16,8 +16,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-
-	"gopkg.in/alessio/shellescape.v1"
 )
 
 type operation struct {
@@ -29,8 +27,8 @@ type operation struct {
 var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 var delaySeconds = 10
-var delayString string
 var annotation = "k8s.smp.io/delayed-termination"
+var admissionServiceIp string
 
 func init() {
 	corev1.AddToScheme(scheme)
@@ -51,16 +49,18 @@ func main() {
 		"Pre stop delay in seconds")
 	flag.StringVar(&annotation, "annotation", annotation, ""+
 		"Pod annotation")
+	flag.StringVar(&admissionServiceIp, "admission-service-ip", admissionServiceIp,
+		"IP of this service")
 
 	flag.Parse()
 
-	delayString = fmt.Sprint(delaySeconds, "s")
-
 	http.HandleFunc("/", serve)
+	http.HandleFunc("/delay", serveDelay)
 	server := &http.Server{
 		Addr:      ":443",
 		TLSConfig: configTLS(CertFile, KeyFile),
 	}
+	go server.ListenAndServe()
 	server.ListenAndServeTLS("", "")
 }
 
@@ -191,10 +191,12 @@ func makeContainerOperation(index int, c *corev1.Container) *operation {
 	var opPath string
 	var opValue interface{}
 
-	lifecycle := map[string]map[string]map[string][]string{
-		"preStop": map[string]map[string][]string{
-			"exec": map[string][]string{
-				"command": []string{"sleep", delayString},
+	lifecycle := map[string]map[string]map[string]interface{}{
+		"preStop": {
+			"httpGet": {
+				"host": admissionServiceIp,
+				"path": "/delay",
+				"port": 80,
 			},
 		},
 	}
@@ -205,24 +207,9 @@ func makeContainerOperation(index int, c *corev1.Container) *operation {
 	} else if c.Lifecycle.PreStop == nil {
 		opPath = fmt.Sprint("/spec/containers/", index, "/lifecycle/preStop")
 		opValue = lifecycle["preStop"]
-	} else if c.Lifecycle.PreStop.Exec == nil {
-		opPath = fmt.Sprint("/spec/containers/", index, "/lifecycle/preStop/exec")
-		opValue = lifecycle["preStop"]["exec"]
-	} else if c.Lifecycle.PreStop.Exec.Command == nil {
-		opPath = fmt.Sprint("/spec/containers/", index, "/lifecycle/preStop/exec/command")
-		opValue = lifecycle["preStop"]["exec"]["command"]
-	} else {
-		oldCmd := c.Lifecycle.PreStop.Exec.Command
-
-		escapedOldCmd := make([]string, len(oldCmd))
-		for i, term := range oldCmd {
-			escapedOldCmd[i] = shellescape.Quote(term)
-		}
-
-		script := fmt.Sprint("sleep ", delayString, "\nexec ", strings.Join(escapedOldCmd, " "), "\n")
-
-		opPath = fmt.Sprint("/spec/containers/", index, "/lifecycle/preStop/exec/command")
-		opValue = []string{"sh", "-c", script}
+	} else if c.Lifecycle.PreStop.HTTPGet == nil {
+		opPath = fmt.Sprint("/spec/containers/", index, "/lifecycle/preStop/httpGet")
+		opValue = lifecycle["preStop"]["httpGet"]
 	}
 
 	return &operation{
@@ -230,4 +217,9 @@ func makeContainerOperation(index int, c *corev1.Container) *operation {
 		Path:  opPath,
 		Value: opValue,
 	}
+}
+
+func serveDelay(w http.ResponseWriter, r *http.Request) {
+	time.Sleep(time.Duration(delaySeconds) * time.Second)
+	fmt.Fprint(w, "OK")
 }
