@@ -56,13 +56,12 @@ func main() {
 
 	delayString = fmt.Sprint(delaySeconds, "s")
 
-	http.HandleFunc("/", mkServe())
+	http.HandleFunc("/", serve)
 	server := &http.Server{
 		Addr:      ":443",
 		TLSConfig: configTLS(CertFile, KeyFile),
 	}
 	server.ListenAndServeTLS("", "")
-
 }
 
 func configTLS(CertFile string, KeyFile string) *tls.Config {
@@ -75,50 +74,48 @@ func configTLS(CertFile string, KeyFile string) *tls.Config {
 	}
 }
 
-func mkServe() func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var body []byte
-		if r.Body != nil {
-			if data, err := ioutil.ReadAll(r.Body); err == nil {
-				body = data
-			}
+func serve(w http.ResponseWriter, r *http.Request) {
+	var body []byte
+	if r.Body != nil {
+		if data, err := ioutil.ReadAll(r.Body); err == nil {
+			body = data
 		}
+	}
 
-		// verify the content type is accurate
-		contentType := r.Header.Get("Content-Type")
+	// verify the content type is accurate
+	contentType := r.Header.Get("Content-Type")
 
-		var reviewResponse *v1beta1.AdmissionResponse
+	var reviewResponse *v1beta1.AdmissionResponse
 
-		if contentType != "application/json" {
-			log.Printf("contentType=%s, expect application/json", contentType)
-			return
-		}
+	if contentType != "application/json" {
+		log.Printf("contentType=%s, expect application/json", contentType)
+		return
+	}
 
-		ar := v1beta1.AdmissionReview{}
-		deserializer := codecs.UniversalDeserializer()
-		if _, _, err := deserializer.Decode(body, nil, &ar); err != nil {
-			log.Print(err)
-			reviewResponse = toAdmissionResponse(err)
-		} else {
-			reviewResponse = admit(ar)
-		}
+	ar := v1beta1.AdmissionReview{}
+	deserializer := codecs.UniversalDeserializer()
+	if _, _, err := deserializer.Decode(body, nil, &ar); err != nil {
+		log.Print(err)
+		reviewResponse = toAdmissionResponse(err)
+	} else {
+		reviewResponse = admit(ar)
+	}
 
-		response := v1beta1.AdmissionReview{}
-		if reviewResponse != nil {
-			response.Response = reviewResponse
-			response.Response.UID = ar.Request.UID
-		}
-		// reset the Object and OldObject, they are not needed in a response.
-		ar.Request.Object = runtime.RawExtension{}
-		ar.Request.OldObject = runtime.RawExtension{}
+	response := v1beta1.AdmissionReview{}
+	if reviewResponse != nil {
+		response.Response = reviewResponse
+		response.Response.UID = ar.Request.UID
+	}
+	// reset the Object and OldObject, they are not needed in a response.
+	ar.Request.Object = runtime.RawExtension{}
+	ar.Request.OldObject = runtime.RawExtension{}
 
-		resp, err := json.Marshal(response)
-		if err != nil {
-			log.Print(err)
-		}
-		if _, err := w.Write(resp); err != nil {
-			log.Print(err)
-		}
+	resp, err := json.Marshal(response)
+	if err != nil {
+		log.Print(err)
+	}
+	if _, err := w.Write(resp); err != nil {
+		log.Print(err)
 	}
 }
 
