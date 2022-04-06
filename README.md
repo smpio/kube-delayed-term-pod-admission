@@ -9,11 +9,11 @@ This [Admission Webhook](https://kubernetes.io/docs/admin/extensible-admission-c
 ```
 lifecycle:
   preStop:
-    exec:
-      command:
-      - sleep
-      - 30s
-terminationGracePeriodSeconds: 60  # default 30 + sleep 30
+    httpGet:
+      host: <service-ip>
+      path: delay
+      port: 80
+terminationGracePeriodSeconds: 40  # default 30 + delay 10
 ```
 
 It also increases `terminationGracePeriodSeconds` with that delay.
